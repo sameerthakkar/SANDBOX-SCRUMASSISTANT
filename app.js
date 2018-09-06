@@ -443,12 +443,20 @@ testLuis = function (message, session) {
         if(linesCount == 0) {
             luisResponseParseIndex = 0;
             parseLuisResponse(session, luisResponseParseIndex);
+            console.log("############################");
+            console.log(momBody);
         }
         
     });
 };
 
+var momSubject = "Minues of Meeting";
+var momBody = "<h1>Minues of Meeting</h1> <br />";
+
 parseLuisResponse = function(session, index) {
+        let userNm = session.message.user.name;
+        momBody += "<br /><b>Updates for " + userNm + " </b><br />";
+
        if(index < luisResponse.length) {
         console.log("luis " + JSON.stringify(luisResponse[index]));
         if(luisResponse[index].topIntent == "Jira-Status") {
@@ -476,6 +484,7 @@ bot.dialog('confirmJiraUpdate2',[
     function (session, args) {
        if(args) {
           appendData = true;
+          momBody += "JIRA " + args.jiraId + " : " + args.jiraStatus + " <br />";
           builder.Prompts.confirm(session, "Jira number " + args.jiraId + " current status is " + args.currentJiraStatus + ". Do you want to change it to " + args.jiraStatus);            
         } else {
           appendData = false;
