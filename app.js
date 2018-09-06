@@ -267,6 +267,16 @@ bot.dialog('StartScrumDialog',[
     matches: 'Start-Scrum'
 })
 
+bot.dialog('ReportingJiraDialog',
+    (session, results) => { 
+        console.log("results " + JSON.stringify(results));
+
+        jiraHandler.getJiraReport(session);
+    }
+).triggerAction({
+    matches: 'Jira-Reporting'
+})
+
 
 addToMap = function(user, key, value) {
     console.log("user -----------------> " + user);
