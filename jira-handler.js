@@ -1,39 +1,20 @@
 /* global builder */
 var request = require("request");
 var builder = require('botbuilder');
+var jiraHost='https://scrumassistant.atlassian.net';
 
-var createJira = function(req,res) {
-var jiraHost='https://scrumdemo007.atlassian.net';
-
-var options = { method: 'POST',
-  url: jiraHost + '/rest/api/2/issue/',
-  headers:
-   { 'postman-token': 'fc7df2de-54ed-3cef-3901-79b2271a9280',
-     'cache-control': 'no-cache',
-     'content-type': 'application/json',
-     'X-Atlassian-Token': 'nocheck',
-     'User-Agent': 'aaabbb',
-     'authorization': 'Basic cGFyYW1wcmVldHNpbmdoMjAwNkBnbWFpbC5jb206SGFja2F0aG9uXzEyMzQ=' },
-  body:
-   { fields:
-      { project: { key: 'SCRUM' },
-        summary: 'Jira Summary.',
-        description: 'Creating of an issue using project keys and issue type names using the REST API',
-        issuetype: { name: 'Bug' } } },
-  json: true };
-
-request(options, function (error, response, body) {
-  if (error) throw new Error(error);
-
-  console.log(body);
-});
-};
+var commonHeader = { 'postman-token': 'fc7df2de-54ed-3cef-3901-79b2271a9280',
+       'cache-control': 'no-cache',
+       'content-type': 'application/json',
+       'X-Atlassian-Token': 'nocheck',
+       'User-Agent': 'aaabbb',
+       'authorization': 'Basic a2h1c2hib29fcGVzd2FuaUBvdXRsb29rLmNvbTpIQGNrQDIwMTg=' };
 
 var getJiraReport = function(session) {
 var options = { method: 'GET',
   url: 'https://scrumassistant.atlassian.net/rest/api/2/search',
   qs: { jql: 'Sprint=1' },
-  headers: 
+  headers:
    { 'postman-token': '03889517-cf05-2e25-c7a3-707a467ce3cb',
      'cache-control': 'no-cache',
      'content-type': 'application/json',
@@ -121,5 +102,141 @@ request(options, function (error, response, body) {
 });
 };
 
+var createJira = function(summary, session) {
+  console.log('inside create jira ---');
+
+  var options = { method: 'POST',
+    url: jiraHost + '/rest/api/2/issue/',
+    headers:commonHeader,
+    body:
+     { fields:
+        { project: { key: 'SCRUM' },
+          summary: summary || "Default - Update summary",
+          description: 'Creating of an issue using project keys and issue type names using the REST API',
+          issuetype: { name: 'Task' } } },
+    json: true };
+
+  request(options, function (error, response, body) {
+    if (error) throw new Error(error);
+    console.log(body.key);
+    console.log('check session::: '+JSON.stringify(session));
+    session.send('Jira Id '+body.key+' created successfully with summary \'%s\'',session.dialogData.summary);
+    session.endDialog();
+    console.log(body);
+  });
+};
+
+
+var assignJira = function(jiraId, assigneeName) {
+  var options = { method: 'PUT',
+    url: jiraHost + '/rest/api/2/issue/'+jiraId,
+    headers:commonHeader,
+    body: { fields: { assignee: { name: assigneeName } } },
+    json: true };
+
+  request(options, function (error, response, body) {
+    if (error) throw new Error(error);
+    // console.log("FAILURE");
+    // console.log(JSON.stringify(error));
+    // console.log(JSON.stringify(response));
+    console.log(body);
+  });
+};
+
+var commentJira = function(jiraId, comment) {
+console.log("update jira with comment: " + comment + " for Jira id: " + jiraId);
+var options = { method: 'POST',
+  url: jiraHost + '/rest/api/2/issue/'+jiraId + '/comment',
+  headers:
+   { 'postman-token': 'fc7df2de-54ed-3cef-3901-79b2271a9280',
+     'cache-control': 'no-cache',
+     'content-type': 'application/json',
+     'X-Atlassian-Token': 'nocheck',
+     'User-Agent': 'aaabbb',
+     'authorization': 'Basic a2h1c2hib29fcGVzd2FuaUBvdXRsb29rLmNvbTpIQGNrQDIwMTg='},
+    body: comment,
+  json: true };
+
+request(options, function (error, response, body) {
+  if (error) throw new Error(error);
+});
+};
+
+var updateJiraStatus = function(jiraId, transitionId) {
+console.log("update jira status transtion id: " + transitionId + " Jira id: " + jiraId);
+var options = { method: 'POST',
+  url: jiraHost + '/rest/api/2/issue/'+jiraId + '/transitions',
+  headers:
+   { 'postman-token': 'fc7df2de-54ed-3cef-3901-79b2271a9280',
+     'cache-control': 'no-cache',
+     'content-type': 'application/json',
+     'X-Atlassian-Token': 'nocheck',
+     'User-Agent': 'aaabbb',
+     'authorization': 'Basic a2h1c2hib29fcGVzd2FuaUBvdXRsb29rLmNvbTpIQGNrQDIwMTg=' },
+    body: { transition: {id : transitionId} },
+  json: true };
+
+request(options, function (error, response, body) {
+  if (error) throw new Error(error);
+
+  console.log("************"+JSON.stringify(body));
+
+});
+};
+
+var updateStatus = function(jiraId, status, response, session) {
+
+  var options = { method: 'GET',
+    url: jiraHost + '/rest/api/2/issue/'+jiraId + '/transitions',
+    headers:
+     { 'postman-token': 'fc7df2de-54ed-3cef-3901-79b2271a9280',
+       'cache-control': 'no-cache',
+       'content-type': 'application/json',
+       'X-Atlassian-Token': 'nocheck',
+       'User-Agent': 'aaabbb',
+       'authorization': 'Basic a2h1c2hib29fcGVzd2FuaUBvdXRsb29rLmNvbTpIQGNrQDIwMTg=' },
+    json: true };
+
+  console.log("JIRA ID " + jiraId);
+
+
+  request(options, function (error, response, body, session) {
+    if (error) throw new Error(error);
+      console.log(JSON.stringify(body));
+
+     var transitionId = body.transitions.find(transition =>transition.name.toUpperCase() === status.toUpperCase());
+
+      console.log("=RESPONSE-" + response);
+      console.log("=transition id-" + transitionId.id);
+      updateJiraStatus(jiraId, transitionId.id);
+  });
+};
+
+var statusJira = function(jiraId, session) {
+
+var options = { method: 'GET',
+  url: jiraHost + '/rest/api/2/issue/'+jiraId,
+  headers:
+   { 'postman-token': 'fc7df2de-54ed-3cef-3901-79b2271a9280',
+     'cache-control': 'no-cache',
+     'content-type': 'application/json',
+     'X-Atlassian-Token': 'nocheck',
+     'User-Agent': 'aaabbb',
+     'authorization': 'Basic a2h1c2hib29fcGVzd2FuaUBvdXRsb29rLmNvbTpIQGNrQDIwMTg=' },
+  json: true };
+
+request(options, function (error, response, body) {
+  if (error) throw new Error(error);
+  //console.log("======================================"+JSON.stringify(body.fields));
+  console.log("JIRA STATUS IS: "  + body.fields.status.name);
+  session.send('Jira status for JIRA ID : ' + jiraId + " is " + body.fields.status.name);
+  session.endDialog();
+});
+};
+
 module.exports.createJira = createJira;
+module.exports.assignJira = assignJira;
+module.exports.updateStatus = updateStatus;
+module.exports.commentJira = commentJira;
 module.exports.getJiraReport = getJiraReport;
+module.exports.statusJira = statusJira;
