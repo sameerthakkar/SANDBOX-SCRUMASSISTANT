@@ -162,3 +162,22 @@ getMap = function() {
      return dataMap;
  }
 
+// Function to test LUIS API 
+testLuis = function (message) {
+    var request = require("request");
+
+    var options = {
+        method: 'GET',
+        url: 'https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/1a8c2639-3734-4eb7-a2fe-00be43b94b12?subscription-key=482a9ae8cb9543f0b4c80728a14ae598&verbose=true&timezoneOffset=0&q=' + message,
+    }
+
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+
+        console.log("Response: " + body);
+        var jsonObj = JSON.parse(body);
+        var topIntent = jsonObj.topScoringIntent.intent;
+        var entities = jsonObj.entities;
+        return [topIntent, entities];
+    });
+};
