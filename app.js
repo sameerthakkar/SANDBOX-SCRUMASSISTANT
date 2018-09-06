@@ -5,7 +5,7 @@ A simple Language Understanding (LUIS) bot for the Microsoft Bot Framework.
 var restify = require('restify');
 var builder = require('botbuilder');
 var botbuilder_azure = require("botbuilder-azure");
-
+var dataMap = {};
 // Setup Restify Server
 var server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3978, function () {
@@ -28,25 +28,94 @@ server.post('/api/messages', connector.listen());
 * For samples and documentation, see: https://github.com/Microsoft/BotBuilder-Azure
 * ---------------------------------------------------------------------------------------- */
 
-var tableName = 'botdata';
-var azureTableClient = new botbuilder_azure.AzureTableClient(tableName, process.env['AzureWebJobsStorage']);
-var tableStorage = new botbuilder_azure.AzureBotStorage({ gzipData: false }, azureTableClient);
+var inMemoryStorage = new builder.MemoryBotStorage();
 
 // Create your bot with a function to receive messages from the user
 // This default message handler is invoked if the user's utterance doesn't
 // match any intents handled by other dialogs.
-var bot = new builder.UniversalBot(connector, function (session, args) {
-    session.send('You reached the default message handler. You said \'%s\'.', session.message.text);
-});
+var bot = new builder.UniversalBot(connector, [
+    function (session, result, next) {
+        session.send("Welcome to your Scrum Assistant");
+        session.beginDialog('startScrum');
+    },
+    function (session, result, next) {
+        if(result.response) {
+            builder.Prompts.text(session, "Can you let me know what you worked on yesterday?");
+        } else {
+            session.send('No problem lets connect some time later !!');
+            session.endDialog();       
+       }
+    },
+   
+    function (session, result, next) {
+        addToMap(session.message.user.name, "workedOn", result.response);
+        builder.Prompts.text(session, "What are you working on today?");
+    },
+    function (session, result, next) {
+        addToMap(session.message.user.name, "workingOn", result.response);
+        builder.Prompts.text(session, "Are ther any blockers on tasks you are working on?");
+    },
+    function (session, result, next) {
+        addToMap(session.message.user.name, "blockers", result.response);
+        session.send('Thanks for your response.');
+        session.endDialog();   
+    },
+]);
 
-bot.set('storage', tableStorage);
+
+bot.dialog('startScrum', [
+    function (session) {
+        builder.Prompts.confirm(session, "Hope you are doing fine!! Should we get started with standup ?");
+    },
+    function (session, results) {
+        session.endDialogWithResult(results);
+    }
+]);
+
+bot.dialog('checkAndStart', [
+    function (session, result) {
+        if(result.response) {
+            builder.Prompts.text(session, "Can you let me know what you worked on yesterday?");
+        } else {
+            session.send('No problem lets connect some time later !!');
+            session.endDialog();       
+       }
+    },
+    function (session, results) {
+        session.endDialogWithResult(results);
+    }
+]);
+
+
+bot.dialog('scrumTodayUpdate', [
+    function (session, result, next) {
+        addToMap(session.message.user.name, "workedOn", result.response);
+        builder.Prompts.text(session, "What are you working on today?");
+    },
+    function (session, results) {
+        session.endDialogWithResult(results);
+    }
+]);
+
+bot.dialog('scrumBlocker', [
+    function (session, result, next) {
+        addToMap(session.message.user.name, "workingOn", result.response);
+        builder.Prompts.text(session, "Are ther any blockers on tasks you are working on?");
+    },
+    function (session, results) {
+        session.endDialogWithResult(results);
+    }
+]);
+
+bot.set('storage', inMemoryStorage);
 
 // Make sure you add code to validate these fields
 var luisAppId = process.env.LuisAppId;
 var luisAPIKey = process.env.LuisAPIKey;
 var luisAPIHostName = process.env.LuisAPIHostName || 'westus.api.cognitive.microsoft.com';
 
-const LuisModelUrl = 'https://' + luisAPIHostName + '/luis/v2.0/apps/' + luisAppId + '?subscription-key=' + luisAPIKey;
+//const LuisModelUrl = 'https://' + luisAPIHostName + '/luis/v2.0/apps/' + luisAppId + '?subscription-key=' + luisAPIKey;
+const LuisModelUrl="https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/1a8c2639-3734-4eb7-a2fe-00be43b94b12?subscription-key=482a9ae8cb9543f0b4c80728a14ae598&verbose=true&timezoneOffset=0&q=";
 
 // Create a recognizer that gets intents from LUIS, and add it to the bot
 var recognizer = new builder.LuisRecognizer(LuisModelUrl);
@@ -80,4 +149,16 @@ bot.dialog('CancelDialog',
 ).triggerAction({
     matches: 'Cancel'
 })
+
+
+addToMap = function(user, key, value) {
+    if(!dataMap[user]) {
+     dataMap[user]={};
+    }
+    dataMap[user][key]=value;
+ }
+
+getMap = function() {
+     return dataMap;
+ }
 
