@@ -369,6 +369,7 @@ bot.dialog('UpdateJiraCommentDialog',[
     function (session, results, next) {
         console.log(JSON.stringify(results));
         session.dialogData.comment = results.response;
+        console.log(session.dialogData.comment);
         jiraHandler.commentJira(session.dialogData.jiraId, session.dialogData.comment);
         session.send('Comment on Jira '+session.dialogData.jiraId+' successfully updated');
         session.endDialog();
@@ -399,7 +400,7 @@ bot.dialog('getJiraStatusDialog',[
         const jiraId = results.intent.entities.find(entity => entity.type === 'Jira-Id').entity.replace(/\s/g,'');
         console.log("input Jira ID "+jiraId);
 
-        jiraHandler.statusJira(jiraId, session);
+        jiraHandler.getJiraStatus(jiraId, session);
 
     },
 ]

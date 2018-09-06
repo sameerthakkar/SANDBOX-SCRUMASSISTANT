@@ -154,7 +154,7 @@ var options = { method: 'POST',
      'X-Atlassian-Token': 'nocheck',
      'User-Agent': 'aaabbb',
      'authorization': 'Basic a2h1c2hib29fcGVzd2FuaUBvdXRsb29rLmNvbTpIQGNrQDIwMTg='},
-    body: comment,
+    body: {body: comment},
   json: true };
 
 request(options, function (error, response, body) {
@@ -212,7 +212,7 @@ var updateStatus = function(jiraId, status, response, session) {
   });
 };
 
-var statusJira = function(jiraId, session) {
+var getJiraStatus = function(jiraId, session) {
 
 var options = { method: 'GET',
   url: jiraHost + '/rest/api/2/issue/'+jiraId,
@@ -227,7 +227,7 @@ var options = { method: 'GET',
 
 request(options, function (error, response, body) {
   if (error) throw new Error(error);
-  //console.log("======================================"+JSON.stringify(body.fields));
+  console.log("======================================"+JSON.stringify(body));
   console.log("JIRA STATUS IS: "  + body.fields.status.name);
   session.send('Jira status for JIRA ID : ' + jiraId + " is " + body.fields.status.name);
   session.endDialog();
@@ -239,4 +239,4 @@ module.exports.assignJira = assignJira;
 module.exports.updateStatus = updateStatus;
 module.exports.commentJira = commentJira;
 module.exports.getJiraReport = getJiraReport;
-module.exports.statusJira = statusJira;
+module.exports.getJiraStatus = getJiraStatus;
