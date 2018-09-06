@@ -9,6 +9,9 @@ const cron = require("node-cron");
 var dataMap = {};
 var appendData = true;
 var currentDialog = "";
+var linesCount=0;
+var luisResponse = [];
+var luisResponseParseIndex=0;
 var address = JSON.parse("{\"id\":\"1536229691387\",\"channelId\":\"skype\",\"user\":{\"id\":\"29:1f-ZGEa9WTsGODII4h-2Z1AcSlSuevCEq6w_rt1f7-f8\"},\"conversation\":{\"id\":\"29:1f-ZGEa9WTsGODII4h-2Z1AcSlSuevCEq6w_rt1f7-f8\"},\"bot\":{\"id\":\"28:55b7bdd5-da0a-4053-a010-6280955ce335\",\"name\":\"scrumAssistant\"},\"serviceUrl\":\"https:\/\/smba.trafficmanager.net\/apis\/\"}");
 var jiraHandler = require("./jira-handler");
 // Setup Restify Server
@@ -51,19 +54,37 @@ var bot = new builder.UniversalBot(connector, [
     function (session, result, next) {
         session.beginDialog('scrumYesterday');
     },
-
     function (session, result, next) {
-        session.beginDialog('scrumTodayUpdate');
-    },
-    function (session, result, next) {
-        session.beginDialog('scrumBlocker');
-    },
-    function (session, result, next) {
-        session.send('Thanks for your response.');
-        session.endDialog();
+        session.send('Thanks for your response. Let me cross check if everyhting is updated fine.');
+        getEachSentenceIntent(session);
+        //session.endDialog();   
     },
 ]);
 
+getEachSentenceIntent = function(session) {
+    luisResponse=[];  linesCount = 0;
+    let userName = session.message.user.name;
+    console.log("Worked on  " + JSON.stringify(dataMap[userName]["workedOn"]));
+    for(let workedOnIndex = 0; workedOnIndex < dataMap[userName]["workedOn"].length; workedOnIndex++) {
+        
+        let paras = dataMap[userName]["workedOn"][workedOnIndex].split("\n");
+        console.log("paras on  " + JSON.stringify(paras));
+       
+        for(let i=0; i<paras.length; i++) {
+            let lines = paras[i].split(".");
+            console.log("lines  on  " + JSON.stringify(lines));
+            for(let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+               console.log("line  " + lines[lineIndex]);
+               if(lines[lineIndex]) {
+                linesCount ++;
+                testLuis(lines[lineIndex], session);
+               }
+               
+            }
+        }
+    }
+    
+}
 //bot.beginDialog(address, 'startScrum');
 
 //  cron.schedule("* * * * *", function() {
@@ -104,12 +125,6 @@ bot.dialog('startScrum', [
     },
 
     function (session, result, next) {
-        session.beginDialog('scrumTodayUpdate');
-    },
-    function (session, result, next) {
-        session.beginDialog('scrumBlocker');
-    },
-    function (session, result, next) {
         session.send('Thanks for your response.');
         session.endDialog();
     },
@@ -138,7 +153,7 @@ bot.dialog('scrumYesterday', [
           builder.Prompts.text(session, "Ok. What else?");
         } else {
           appendData = false;
-          builder.Prompts.text(session, "Can you let me know what you worked on yesterday?");
+          builder.Prompts.text(session, "Can you let me know what you worked on yesterday? What are you working on Today and are there any blockers?");            
         }
 
     },
@@ -199,6 +214,9 @@ bot.dialog('scrumBlocker', [
     }
 ]);
 
+
+
+
 bot.set('storage', inMemoryStorage);
 
 // Make sure you add code to validate these fields
@@ -241,7 +259,8 @@ bot.dialog('CancelDialog',
     }
 ).triggerAction({
     matches: 'Cancel'
-})
+})  
+
 
 bot.dialog('StartScrumDialog',[
     function (session, result, next) {
@@ -250,14 +269,6 @@ bot.dialog('StartScrumDialog',[
     },
     function (session, result, next) {
         session.beginDialog('scrumYesterday');
-    },
-
-    function (session, result, next) {
-        session.beginDialog('scrumTodayUpdate');
-    },
-
-    function (session, result, next) {
-        session.beginDialog('scrumBlocker');
     },
 
     function (session, result, next) {
@@ -351,7 +362,6 @@ bot.dialog('updateStatusDialog',[
         const jiraStatus = results.intent.entities.find(entity => entity.type === "Jira-Status").entity;
         const jiraId = results.intent.entities.find(entity => entity.type === 'Jira-Id').entity.replace(/\s/g,'');
         console.log("Update status of Jira ID "+jiraId+ " to >>>> status " + JSON.stringify(jiraStatus));
-
         jiraHandler.updateStatus(jiraId, jiraStatus, results.response, session);
         session.send('Jira status is successfully updated to \'%s\'',jiraStatus);
         session.endDialog();
@@ -406,3 +416,81 @@ bot.dialog('getJiraStatusDialog',[
 ).triggerAction({
     matches: 'Jira-Status-Get'
 })
+
+testLuis = function (message, session) {
+    var request = require("request");
+   console.log("calling kluis for " + message + " linesCount " + linesCount);
+    var options = {
+        method: 'GET',
+        url: 'https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/00253af6-c210-4fdf-92dd-6ec261ecf58e?subscription-key=263b179fa47e4cb58be54e91e0109ca3&spellCheck=true&bing-spell-check-subscription-key={YOUR_BING_KEY_HERE}&verbose=true&timezoneOffset=0&q=' + message,
+    }
+
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+
+        console.log("Response for message  " + message + " " + body);
+        var jsonObj = JSON.parse(body);
+        if(jsonObj &&  jsonObj.topScoringIntent) {
+            var topIntent = jsonObj.topScoringIntent.intent;
+            var entities = jsonObj.entities;
+            let response2 = {};
+            response2.topIntent = topIntent;
+            response2.entities = entities;
+            luisResponse[luisResponse.length] = response2;
+        }
+       
+        linesCount--;
+        if(linesCount == 0) {
+            luisResponseParseIndex = 0;
+            parseLuisResponse(session, luisResponseParseIndex);
+        }
+        
+    });
+};
+
+parseLuisResponse = function(session, index) {
+       if(index < luisResponse.length) {
+        console.log("luis " + JSON.stringify(luisResponse[index]));
+        if(luisResponse[index].topIntent == "Jira-Status") {
+            let jiraId = luisResponse[index].entities.filter(entity => entity.type == "Jira-Id").entity;
+            let jiraStatus = luisResponse[index].entities.filter(entity => entity.type == "Jira-Status").entity;
+            let currentJiraStatus = "ssds";
+            if(jiraStatus != currentJiraStatus) {
+                let args = {};
+                args.jiraId = jiraId || "dumm";
+                args.jiraStatus = jiraStatus || "sssss";
+                args.currentJiraStatus = currentJiraStatus;
+                
+                session.beginDialog('confirmJiraUpdate2', args);
+                console.log('passed ' + index);
+            }
+        } else {
+            parseLuisResponse(session, ++luisResponseParseIndex);
+        }
+       }
+       
+    
+};
+
+bot.dialog('confirmJiraUpdate2',[
+    function (session, args) {
+       if(args) {
+          appendData = true;
+          builder.Prompts.confirm(session, "Jira number " + args.jiraId + " current status is " + args.currentJiraStatus + ". Do you want to change it to " + args.jiraStatus);            
+        } else {
+          appendData = false;
+          builder.Prompts.text(session, "Else condition no args ");            
+        }
+    },
+    function (session, results) {
+        if(results.response) {
+            session.send("Updated jira status");
+        } else {
+            session.send("Ok ! Leaving as it is");
+
+        }
+        session.endDialog();
+        parseLuisResponse(session, ++luisResponseParseIndex);
+    }
+]
+);

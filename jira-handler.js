@@ -203,7 +203,9 @@ var updateStatus = function(jiraId, status, response, session) {
   request(options, function (error, response, body, session) {
     if (error) throw new Error(error);
       console.log(JSON.stringify(body));
-
+    if(!body || !body.transitions) {
+      return;
+    }
      var transitionId = body.transitions.find(transition =>transition.name.toUpperCase() === status.toUpperCase());
 
       console.log("=RESPONSE-" + response);
